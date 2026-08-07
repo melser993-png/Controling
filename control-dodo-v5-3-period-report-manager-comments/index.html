@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Контролинг сети</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="dash">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">🦤</div>
+        <div>
+          <h1>Контролинг сети</h1>
+          <p>Додо Пицца</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <label class="period-label">Период
+          <input id="periodInput" type="month" />
+        </label>
+        <a class="admin-btn" href="/admin.html">Кабинет контролинга</a>
+        <button id="refreshBtn" class="ghost-btn" type="button">↻</button>
+      </div>
+    </header>
+
+    <section id="demoNotice" class="notice hidden">Демо-режим: API не загрузил таблицу</section>
+
+    <section class="top-grid">
+      <div class="panel">
+        <h2>🏆 Топ-3 лучших пиццерий <small>(по среднему баллу)</small></h2>
+        <div id="topBest" class="rank-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>🚨 Топ-3 пиццерии, требующие внимания</h2>
+        <div id="topAttention" class="rank-list attention"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Нарушения D2 / D3 по сети</h2>
+          <span id="periodLabel1"></span>
+        </div>
+        <div class="metric-grid">
+          <button class="metric clickable" id="openD2Network"><span>D2</span><strong id="networkD2">0</strong></button>
+          <button class="metric clickable" id="openD3Network"><span>D3</span><strong id="networkD3">0</strong></button>
+          <div class="metric"><span>Всего</span><strong id="networkAllErrors">0</strong></div>
+          <button class="metric clickable" id="openRiskNetwork"><span>В зоне риска</span><strong id="networkRisk">0</strong></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="main-grid">
+      <aside>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Нарушения D2 / D3: <span id="selectedPizzaTitle">—</span></h2>
+            <span id="periodLabel2"></span>
+          </div>
+          <div class="metric-grid mini">
+            <button class="metric clickable" id="openD2Pizza"><span>D2</span><strong id="pizzaD2">0</strong></button>
+            <button class="metric clickable" id="openD3Pizza"><span>D3</span><strong id="pizzaD3">0</strong></button>
+            <div class="metric"><span>Всего</span><strong id="pizzaAllErrors">0</strong></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <label class="select-label">Выбранная пиццерия
+            <select id="pizzaSelect"></select>
+          </label>
+          <div class="side-stat">
+            <span>Средний балл за <b id="periodLabel3"></b></span>
+            <strong id="pizzaAvg">0</strong>
+          </div>
+          <div class="side-stat">
+            <span>Проверок за месяц</span>
+            <strong id="pizzaChecks">0</strong>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="metric-grid mini">
+            <button class="metric clickable" id="openD3Network2"><span>D3 по сети</span><strong id="networkD3b">0</strong></button>
+            <button class="metric clickable" id="openD2Network2"><span>D2 по сети</span><strong id="networkD2b">0</strong></button>
+            <div class="metric"><span>Критических нарушений</span><strong id="networkCritical">0</strong></div>
+            <button class="metric clickable" id="openRiskNetwork2"><span>Пиццерий в зоне риска</span><strong id="networkRiskB">0</strong></button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="panel chart-panel">
+        <div class="panel-head">
+          <h2>Динамика среднего балла: <span id="chartPizzaTitle">—</span></h2>
+          <span id="periodLabel4"></span>
+        </div>
+        <div class="chart-area">
+          <div id="barChart" class="bar-chart"></div>
+          <div class="chart-summary">
+            <div><span>Средний балл</span><strong id="chartAvg">0</strong></div>
+            <div><span>Лучшая проверка</span><strong id="chartBest">0</strong></div>
+            <div><span>Худшая проверка</span><strong id="chartWorst">0</strong></div>
+            <div><span>Количество ошибок</span><strong id="chartErrors">0</strong></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="red"></i>&lt; 85</span>
+          <span><i class="yellow"></i>85–89</span>
+          <span><i class="green"></i>90–100</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Ошибки: <span id="errorsPizzaTitle">—</span></h2>
+          <span id="periodLabel5"></span>
+        </div>
+        <button id="downloadErrorsBtn" class="orange-mini" type="button">⬇ Скачать ошибки</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Проверяющий</th>
+              <th>Ошибка</th>
+              <th>Комментарий проверяющего</th>
+              <th>Комментарий управляющего</th>
+              <th>Вес</th>
+              <th>Уровень</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pizzaErrorsTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Таблица контроля</h2>
+        <span>компактный рейтинг</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Пиццерия</th>
+              <th>Балл</th>
+              <th>Ошибки</th>
+              <th>D2</th>
+              <th>D3</th>
+              <th>Проверяющий</th>
+            </tr>
+          </thead>
+          <tbody id="controlTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>Все данные загружаются из Google Таблицы · Вес нарушения: (-50) = D2, (-100) = D3</footer>
+  </main>
+
+  <dialog id="listDialog" class="dialog">
+    <div class="dialog-head">
+      <h2 id="dialogTitle">Список</h2>
+      <button id="dialogCloseBtn" type="button">×</button>
+    </div>
+    <div id="dialogContent"></div>
+  </dialog>
+
+  <dialog id="appealDialog" class="dialog appeal-dialog">
+    <form id="appealForm" method="dialog">
+      <div class="dialog-head">
+        <h2>Подать апелляцию</h2>
+        <button id="appealCloseBtn" type="button">×</button>
+      </div>
+      <p id="appealMeta" class="muted"></p>
+      <div class="appeal-error"><span>Ошибка</span><strong id="appealErrorText">—</strong></div>
+      <label>Email для ответа <input id="appealEmail" type="email" required /></label>
+      <label>Комментарий управляющего <textarea id="appealComment" rows="5" required></textarea></label>
+      <label>Фото / видео подтверждение <input id="appealFiles" type="file" multiple accept="image/*,video/*,.pdf" /></label>
+      <div class="actions">
+        <button type="button" id="appealCancelBtn" class="ghost">Отмена</button>
+        <button type="submit" id="appealSubmitBtn" class="admin-btn">Отправить апелляцию</button>
+      </div>
+      <div id="appealStatus" class="status"></div>
+    </form>
+  </dialog>
+
+  <script src="script.js"></script>
+</body>
+</html>

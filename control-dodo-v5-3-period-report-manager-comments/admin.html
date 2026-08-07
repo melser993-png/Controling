@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Кабинет контролинга</title><link rel="stylesheet" href="admin.css"/></head>
+<body>
+<div id="loginScreen" class="login-screen"><form id="loginForm" class="login-card"><div class="logo biglogo">🦤</div><h1>Dodo Control</h1><p>Вход в кабинет контролинга</p><label>Пользователь<select id="loginUser"><option>Мельникова Полина</option><option>Хамидова Камила</option></select></label><label>Пароль<input id="loginPassword" type="password" required></label><button class="primary" type="submit">Войти</button><div id="loginError" class="error"></div></form></div>
+<div id="app" class="admin hidden">
+<aside><div class="brand"><div class="logo">🦤</div><div><h2>Dodo Control</h2><p>Кабинет контролинга</p></div></div><div class="userbox"><span>Вы вошли как</span><b id="currentUserName">—</b><button id="logoutBtn">Выйти</button></div><nav><button class="nav active" data-tab="home">Главная</button><button class="nav" data-tab="new">Новая проверка</button><button class="nav" data-tab="checks">Проверки</button><button class="nav" data-tab="appeals">Апелляции</button><button class="nav" data-tab="reports">Отчёты</button><button class="nav" data-tab="users">Пользователи</button><a class="back" href="/index.html">← Дашборд сети</a></nav></aside>
+<main><header><div><h1 id="title">Главная</h1><p id="subtitle">Сводка по сети</p></div><button id="refreshBtn" class="orange">Обновить</button></header><div id="msg" class="msg"></div>
+<section id="tab-home" class="tab active"><div class="kpis"><div class="card"><span>Проверок</span><b id="hChecks">0</b></div><div class="card"><span>Апелляций</span><b id="hAppeals">0</b></div><div class="card"><span>Новых</span><b id="hNew">0</b></div><div class="card"><span>В работе</span><b id="hWork">0</b></div><div class="card"><span>Закрыто</span><b id="hClosed">0</b></div></div><div class="two"><div class="panel"><h2>🏆 Топ-3 лучшие</h2><div id="hTop"></div></div><div class="panel"><h2>🚨 Зона риска</h2><button class="risk-btn" id="showRiskBtn"><b id="hRisk">0</b><span>пиццерий</span></button><div id="riskList" class="risk-list hidden"></div></div></div></section>
+<section id="tab-new" class="tab"><form id="checkForm" class="panel form"><label>Дата проверки
+          <div class="date-picker-wrap">
+            <input name="date" id="checkDateInput" type="date" required>
+            <button id="openDatePickerBtn" class="calendar-btn" type="button">📅 Выбрать дату</button>
+          </div>
+        </label><label>Время проверки<input name="time" type="time" step="1" required></label><label>Пиццерия<select name="pizzeria" id="pizzeriaSelect"></select></label><label>Зона<select name="zone" id="zoneSelect"></select></label><label>Проверяющий<input name="inspector" id="inspectorInput" readonly></label><label>Тип проверки<input name="type" value="Плановая"></label><label class="wide">Комментарий проверки<textarea name="comment" rows="3"></textarea></label><div class="wide"><h2>Нарушения</h2><div id="errorRows"></div><button type="button" id="addErrorBtn" class="orange">Добавить нарушение</button></div><div class="wide actions"><button class="green" type="submit">Отправить проверку</button></div></form></section>
+<section id="tab-checks" class="tab"><div class="panel table-wrap"><table><thead><tr><th>Дата</th><th>Пиццерия</th><th>Балл</th><th>Ошибки</th><th>Проверяющий</th></tr></thead><tbody id="checksTable"></tbody></table></div></section>
+<section id="tab-appeals" class="tab"><div class="panel"><label>Статус<select id="appealFilter"><option value="">Все</option><option>Новая</option><option>В работе</option><option>Удовлетворена</option><option>Не удовлетворена</option></select></label></div><div id="appealsList"></div></section>
+<section id="tab-reports" class="tab">
+  <div class="panel">
+    <h2>Отчёт контролинга за период</h2>
+    <p>Выберите произвольный период. В отчёт попадут все зафиксированные нарушения, комментарии проверяющего, управляющего и контролинга.</p>
+    <div class="report-period-grid">
+      <label>Дата начала
+        <input id="reportDateFrom" type="date">
+      </label>
+      <label>Дата окончания
+        <input id="reportDateTo" type="date">
+      </label>
+      <button id="loadReportBtn" class="orange" type="button">Показать отчёт</button>
+      <button id="exportReportBtn" class="green" type="button">Скачать Excel</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Сводка по пиццериям</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Пиццерия</th>
+            <th>Средний балл</th>
+            <th>Проверок</th>
+            <th>Активных ошибок</th>
+            <th>Всего зафиксировано</th>
+            <th>D2</th>
+            <th>D3</th>
+            <th>Удовлетворённых апелляций</th>
+          </tr>
+        </thead>
+        <tbody id="reportTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Все ошибки за выбранный период</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Пиццерия</th>
+            <th>Проверяющий</th>
+            <th>Зона</th>
+            <th>Время</th>
+            <th>Нарушение</th>
+            <th>Вес</th>
+            <th>Уровень</th>
+            <th>Комментарий проверяющего</th>
+            <th>Комментарий управляющего</th>
+            <th>Статус</th>
+            <th>№ апелляции</th>
+            <th>Комментарий контролинга</th>
+          </tr>
+        </thead>
+        <tbody id="reportErrorsTable"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<section id="tab-users" class="tab">
+  <div class="panel">
+    <h2>Пользователи кабинета контролинга</h2>
+    <p>Пароли теперь хранятся в Google Таблице на листе «Пользователи».</p>
+    <div class="users-grid">
+      <label>ФИО <input id="userNameInput" placeholder="Мельникова Полина"></label>
+      <label>Логин <input id="userLoginInput" placeholder="polina"></label>
+      <label>Пароль <input id="userPasswordInput" placeholder="Новый пароль"></label>
+      <label>Email <input id="userEmailInput" placeholder="email@example.com"></label>
+      <label>Роль <input id="userRoleInput" value="Контролинг"></label>
+      <label>Активен <select id="userActiveInput"><option>Да</option><option>Нет</option></select></label>
+    </div>
+    <button id="saveUserBtn" class="green" type="button">Сохранить пользователя</button>
+  </div>
+  <div class="panel table-wrap">
+    <table>
+      <thead><tr><th>ФИО</th><th>Логин</th><th>Email</th><th>Роль</th><th>Активен</th><th></th></tr></thead>
+      <tbody id="usersTable"></tbody>
+    </table>
+  </div>
+</section>
+</main></div><script src="admin.js"></script></body></html>
