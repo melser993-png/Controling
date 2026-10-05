@@ -40,10 +40,14 @@ label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-wei
 .photoTitle{font-size:13px;font-weight:800;color:var(--muted);margin-bottom:7px}
 .photoBtn{width:100%;border:1px solid #f0a36b;background:#fff7ed;color:#c2410c;border-radius:11px;padding:12px;font-size:14px;font-weight:900;cursor:pointer}
 .photoBtn.ready{background:var(--greenbg);border-color:#86efac;color:var(--green)}
-.photoPreviewWrap{display:none;margin-top:9px;align-items:center;gap:10px}
-.photoPreviewWrap.show{display:flex}
-.photoPreview{width:92px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#f2f4f7}
-.photoReady{font-size:12px;color:var(--green);font-weight:800}
+.photoRule{font-size:12px;line-height:1.4;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:9px 10px;margin-bottom:9px}
+.photoCounter{font-size:12px;font-weight:900;margin:8px 0;color:var(--muted)}
+.photoCounter.ready{color:var(--green)}
+.photoGallery{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}
+.thumb{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#f2f4f7}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.removePhoto{position:absolute;right:4px;top:4px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(17,24,39,.78);color:#fff;font-weight:900;font-size:16px;line-height:26px;padding:0}
+@media(max-width:520px){.photoGallery{grid-template-columns:repeat(3,1fr)}}
 .photoNo{font-size:12px;color:var(--muted);padding:9px 10px;background:#f8fafc;border-radius:10px;border:1px dashed #d0d5dd}
 .req{color:var(--red)}
 .message{display:none;border-radius:14px;padding:14px;margin:10px 0}
@@ -77,10 +81,10 @@ label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-wei
   <div class="card">
     <label for="inspector">Кто проводит обход <span class="req">*</span></label>
     <input class="input" id="inspector" placeholder="ФИО управляющего / менеджера" autocomplete="name">
-    <div class="note">ФИО запоминается на этом устройстве. Дата и время фиксируются сервером автоматически. Фото обязательно для пунктов 1–11; пункт №12 — итоговый, фото не требуется.</div>
+    <div class="note">ФИО запоминается на этом устройстве. Дата и время фиксируются сервером автоматически. Фото требуются только в пунктах 1, 2, 5, 8, 10 и 11 — минимум 20 фото за обход. Все фотографии сохраняются в папке обхода на Google Drive.</div>
   </div>
   <div class="card">
-    <div class="progressRow"><strong>Заполнение чек-листа</strong><strong id="progressText">Статусы 0/12 · Фото 0/11</strong></div>
+    <div class="progressRow"><strong>Заполнение чек-листа</strong><strong id="progressText">Статусы 0/12 · Фото 0/20</strong></div>
     <div class="progress"><div class="bar" id="bar"></div></div>
   </div>
   <div id="items"></div>
@@ -109,35 +113,81 @@ const checklist=[
 ];
 const API="https://ijjtwdbirugofjrrjsax.supabase.co/functions/v1/artem-kitchen-walk";
 const params=new URLSearchParams(location.search),accessKey=params.get("key")||"";
-const state=new Map(),photoState=new Map(),photoUrls=new Map(),problem=new Set(["Не выполнено","Выявлено нарушение"]);
+const state=new Map(),photoState=new Map(),problem=new Set(["Не выполнено","Выявлено нарушение"]);
+const photoRules={
+  1:{min:4,text:"Минимум 4 фото: фото каждого вида теста; обязательно 1 фото лотка с температурой."},
+  2:{min:1,text:"1 фото: чек-лист нагрева теста."},
+  5:{min:5,text:"Минимум 5 фото: все лезвия слайсеров."},
+  8:{min:3,text:"Минимум 3 фото сотрудников в полный рост."},
+  10:{min:2,text:"Минимум 2 фото: вилка тестомеса и подключения печей к розеткам."},
+  11:{min:5,text:"Минимум 5 фото детской комнаты в разных ракурсах."}
+};
+const photoMinTotal=Object.values(photoRules).reduce((sum,r)=>sum+r.min,0);
 function esc(s){const d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML}
 function tick(){const n=new Date();dateNow.textContent=new Intl.DateTimeFormat("ru-RU",{timeZone:"Asia/Vladivostok",weekday:"short",day:"2-digit",month:"long",year:"numeric"}).format(n);timeNow.textContent=new Intl.DateTimeFormat("ru-RU",{timeZone:"Asia/Vladivostok",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(n)}
 tick();setInterval(tick,1000);
 items.innerHTML=checklist.map(x=>{
-  const photo=x.n<=11
-    ? '<div class="photoBox"><div class="photoTitle">Фото <span class="req">*</span></div><input class="photoInput" type="file" accept="image/*" capture="environment" hidden><button type="button" class="photoBtn">📷 Сделать фото</button><div class="photoPreviewWrap"><img class="photoPreview" alt="Фото пункта"><span class="photoReady">Фото сохранено</span></div></div>'
-    : '<div class="photoBox"><div class="photoNo">Фото не требуется — пункт №12 подводит итог по предыдущим пунктам.</div></div>';
+  const rule=photoRules[x.n];
+  const photo=rule
+    ? '<div class="photoBox"><div class="photoTitle">Фото <span class="req">*</span></div><div class="photoRule">'+esc(rule.text)+'</div><input class="photoInput" type="file" accept="image/*" capture="environment" hidden><button type="button" class="photoBtn">📷 Сделать фото</button><div class="photoCounter" data-photo-counter="'+x.n+'">0 / '+rule.min+' минимум</div><div class="photoGallery" data-photo-gallery="'+x.n+'"></div></div>'
+    : '<div class="photoBox"><div class="photoNo">Фото для этого пункта не требуется.</div></div>';
   return '<section class="card item" data-n="'+x.n+'"><div class="itemHead"><div class="num">'+x.n+'</div><div><div class="zone">'+esc(x.zone)+'</div><div class="check">'+esc(x.check)+'</div></div></div><div class="statuses"><button type="button" class="st ok" data-status="Выполнено">✓ Выполнено</button><button type="button" class="st no" data-status="Не выполнено">○ Не выполнено</button><button type="button" class="st bad" data-status="Выявлено нарушение">! Выявлено нарушение</button><button type="button" class="st clear" data-status="Нарушение не выявлено">✓ Нарушение не выявлено</button></div><div class="commentBox"><label>Комментарий / действие <span class="req">*</span></label><textarea class="itemComment" rows="3" placeholder="Что выявлено? Что уже сделано или что необходимо сделать?"></textarea></div>'+photo+'</section>';
 }).join("");
+function totalPhotoCount(){let n=0;photoState.forEach(arr=>n+=arr.length);return n}
+function photoRequirementsMet(){
+  return Object.entries(photoRules).every(([n,rule])=>(photoState.get(Number(n))||[]).length>=rule.min);
+}
 function updateProgress(){
-  const statuses=state.size,total=checklist.length,photos=photoState.size,photoTotal=11;
-  progressText.textContent="Статусы "+statuses+"/"+total+" · Фото "+photos+"/"+photoTotal;
-  stickyCount.textContent=statuses+"/"+total+" · 📷"+photos+"/"+photoTotal;
-  bar.style.width=((statuses+photos)/(total+photoTotal)*100)+"%";
-  save.disabled=statuses!==total||photos!==photoTotal||!inspector.value.trim();
+  const statuses=state.size,total=checklist.length,photos=totalPhotoCount();
+  const cappedPhotos=Object.entries(photoRules).reduce((sum,[n,rule])=>sum+Math.min((photoState.get(Number(n))||[]).length,rule.min),0);
+  progressText.textContent="Статусы "+statuses+"/"+total+" · Фото "+photos+"/"+photoMinTotal+" мин.";
+  stickyCount.textContent=statuses+"/"+total+" · 📷"+photos+"/"+photoMinTotal;
+  bar.style.width=((statuses+cappedPhotos)/(total+photoMinTotal)*100)+"%";
+  save.disabled=statuses!==total||!photoRequirementsMet()||!inspector.value.trim();
 }
 document.querySelectorAll(".st").forEach(btn=>btn.addEventListener("click",()=>{const card=btn.closest(".item"),n=Number(card.dataset.n),status=btn.dataset.status;card.querySelectorAll(".st").forEach(b=>b.classList.remove("sel"));btn.classList.add("sel");card.querySelector(".commentBox").classList.toggle("show",problem.has(status));state.set(n,status);updateProgress()}));
 
 async function compressPhoto(file){
   const bitmap=await createImageBitmap(file);
-  const max=1280;
+  const max=1200;
   let w=bitmap.width,h=bitmap.height;
   if(w>max||h>max){const k=Math.min(max/w,max/h);w=Math.round(w*k);h=Math.round(h*k)}
   const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
   canvas.getContext("2d").drawImage(bitmap,0,0,w,h);
   if(bitmap.close) bitmap.close();
-  const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Не удалось обработать фото")),"image/jpeg",0.72));
+  let quality=.68;
+  let blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Не удалось обработать фото")),"image/jpeg",quality));
+  if(blob.size>850000){
+    quality=.52;
+    blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Не удалось обработать фото")),"image/jpeg",quality));
+  }
   return new File([blob],"photo.jpg",{type:"image/jpeg"});
+}
+
+function renderPhotoGallery(n){
+  const arr=photoState.get(n)||[],rule=photoRules[n];
+  const gallery=document.querySelector('[data-photo-gallery="'+n+'"]');
+  const counter=document.querySelector('[data-photo-counter="'+n+'"]');
+  if(!gallery||!counter)return;
+  counter.textContent=arr.length+" / "+rule.min+" минимум";
+  counter.classList.toggle("ready",arr.length>=rule.min);
+  gallery.innerHTML="";
+  arr.forEach((entry,index)=>{
+    const box=document.createElement("div");box.className="thumb";
+    const img=document.createElement("img");img.src=entry.url;img.alt="Фото "+(index+1);
+    const rm=document.createElement("button");rm.type="button";rm.className="removePhoto";rm.textContent="×";
+    rm.addEventListener("click",()=>{
+      const current=photoState.get(n)||[];
+      const removed=current.splice(index,1)[0];
+      if(removed)URL.revokeObjectURL(removed.url);
+      photoState.set(n,current);
+      renderPhotoGallery(n);updateProgress();
+    });
+    box.appendChild(img);box.appendChild(rm);gallery.appendChild(box);
+  });
+  const btn=gallery.closest(".photoBox").querySelector(".photoBtn");
+  btn.classList.toggle("ready",arr.length>=rule.min);
+  btn.textContent=arr.length>=rule.min?"📷 Добавить ещё фото":"📷 Сделать фото";
 }
 
 document.querySelectorAll(".photoBtn").forEach(btn=>btn.addEventListener("click",()=>{
@@ -146,49 +196,67 @@ document.querySelectorAll(".photoBtn").forEach(btn=>btn.addEventListener("click"
 document.querySelectorAll(".photoInput").forEach(input=>input.addEventListener("change",async()=>{
   const card=input.closest(".item"),n=Number(card.dataset.n),file=input.files&&input.files[0];
   if(!file)return;
-  const btn=card.querySelector(".photoBtn"),wrap=card.querySelector(".photoPreviewWrap"),img=card.querySelector(".photoPreview");
+  const btn=card.querySelector(".photoBtn");
   btn.disabled=true;btn.textContent="Обрабатываю фото…";
   try{
     const compressed=await compressPhoto(file);
-    if(photoUrls.has(n))URL.revokeObjectURL(photoUrls.get(n));
-    const url=URL.createObjectURL(compressed);photoUrls.set(n,url);photoState.set(n,compressed);
-    img.src=url;wrap.classList.add("show");btn.classList.add("ready");btn.textContent="📷 Переснять фото";
-    updateProgress();
+    const arr=photoState.get(n)||[];
+    arr.push({file:compressed,url:URL.createObjectURL(compressed)});
+    photoState.set(n,arr);
+    input.value="";
+    renderPhotoGallery(n);updateProgress();
   }catch(e){
     showMessage("Не удалось обработать фото для пункта №"+n+". Попробуйте ещё раз.","err");
   }finally{btn.disabled=false}
 }));
 inspector.value=localStorage.getItem("artemWalkInspector")||"";inspector.addEventListener("input",()=>{localStorage.setItem("artemWalkInspector",inspector.value);updateProgress()});updateProgress();
 function showMessage(t,type="good"){message.className="message show "+type;message.innerHTML=t;window.scrollTo({top:0,behavior:"smooth"})}
-async function loadHistory(){if(!accessKey){history.innerHTML='<div class="note">Откройте рабочую ссылку с ключом доступа.</div>';return}try{const r=await fetch(API+"?api=history&key="+encodeURIComponent(accessKey),{cache:"no-store"}),j=await r.json();if(!r.ok)throw new Error(j.error||"Ошибка");if(!j.walks.length){history.innerHTML='<div class="note">Сохранённых обходов пока нет.</div>';return}history.innerHTML=j.walks.map(w=>{const dt=new Intl.DateTimeFormat("ru-RU",{timeZone:"Asia/Vladivostok",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(w.created_at));const cls=w.result==="Обход выполнен"?"good":w.result==="Есть нарушения"?"bad":"warn";return '<div class="historyItem"><div><div class="hname">'+esc(w.inspector_name)+'</div><div class="hmeta">'+dt+' · нарушений: '+w.violations_count+' · не выполнено: '+w.not_completed_count+'</div></div><span class="badge '+cls+'">'+esc(w.result)+'</span></div>'}).join("")}catch(e){history.innerHTML='<div class="note">Не удалось загрузить историю.</div>'}}
+async function loadHistory(){if(!accessKey){history.innerHTML='<div class="note">Откройте рабочую ссылку с ключом доступа.</div>';return}try{const r=await fetch(API+"?api=history&key="+encodeURIComponent(accessKey),{cache:"no-store"}),j=await r.json();if(!r.ok)throw new Error(j.error||"Ошибка");if(!j.walks.length){history.innerHTML='<div class="note">Сохранённых обходов пока нет.</div>';return}history.innerHTML=j.walks.map(w=>{const dt=new Intl.DateTimeFormat("ru-RU",{timeZone:"Asia/Vladivostok",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(w.created_at));const cls=w.result==="Обход выполнен"?"good":w.result==="Есть нарушения"?"bad":"warn";const drive=w.drive_folder_url?' · <a href="'+w.drive_folder_url+'" target="_blank" rel="noopener">Google Drive</a>':"";return '<div class="historyItem"><div><div class="hname">'+esc(w.inspector_name)+'</div><div class="hmeta">'+dt+' · нарушений: '+w.violations_count+' · фото: '+(w.photos_uploaded||0)+drive+'</div></div><span class="badge '+cls+'">'+esc(w.result)+'</span></div>'}).join("")}catch(e){history.innerHTML='<div class="note">Не удалось загрузить историю.</div>'}}
 loadHistory();
 save.addEventListener("click",async()=>{
   if(!accessKey){showMessage("Рабочая ссылка открыта без ключа доступа.","err");return}
-  if(photoState.size!==11){showMessage("Сделайте обязательные фото для всех пунктов 1–11.","err");return}
+  for(const [nText,rule] of Object.entries(photoRules)){
+    const n=Number(nText),count=(photoState.get(n)||[]).length;
+    if(count<rule.min){
+      showMessage("Пункт №"+n+": сделайте минимум "+rule.min+" фото. Сейчас "+count+".","err");
+      document.querySelector('.item[data-n="'+n+'"]').scrollIntoView({behavior:"smooth",block:"center"});
+      return;
+    }
+  }
   const itemsData=[];
   for(const x of checklist){
     const status=state.get(x.n),card=document.querySelector('.item[data-n="'+x.n+'"]'),comment=card.querySelector(".itemComment").value.trim();
-    if(problem.has(status)&&!comment){showMessage("Добавьте комментарий/действие к проблемному пункту №"+x.n+".","err");card.scrollIntoView({behavior:"smooth",block:"center"});return}
+    if(problem.has(status)&&!comment){
+      showMessage("Добавьте комментарий/действие к проблемному пункту №"+x.n+".","err");
+      card.scrollIntoView({behavior:"smooth",block:"center"});return;
+    }
     itemsData.push({n:x.n,status,comment});
   }
+
   const fd=new FormData();
   fd.append("inspector_name",inspector.value.trim());
   fd.append("overall_comment",overall.value.trim());
   fd.append("items",JSON.stringify(itemsData));
-  for(let n=1;n<=11;n++)fd.append("photo_"+n,photoState.get(n),"item-"+String(n).padStart(2,"0")+".jpg");
-  save.disabled=true;save.textContent="Сохраняю обход и фото…";
+  photoState.forEach((arr,n)=>{
+    arr.forEach((entry,index)=>fd.append("photo_"+n,entry.file,"item-"+String(n).padStart(2,"0")+"-"+String(index+1).padStart(2,"0")+".jpg"));
+  });
+
+  save.disabled=true;save.textContent="Сохраняю обход и фото на Google Drive…";
   try{
     const r=await fetch(API+"?key="+encodeURIComponent(accessKey),{method:"POST",body:fd}),j=await r.json();
     if(!r.ok)throw new Error(j.error||"Не удалось сохранить");
-    showMessage("<strong>Обход сохранён.</strong><br>"+esc(j.walk.local_time.date)+" "+esc(j.walk.local_time.time)+" · "+esc(j.walk.result)+" · фото: "+j.walk.photos_count+"/11.");
-    state.clear();photoState.clear();
-    photoUrls.forEach(u=>URL.revokeObjectURL(u));photoUrls.clear();
+    const driveLink=j.walk.drive_folder_url?'<br><a href="'+j.walk.drive_folder_url+'" target="_blank" rel="noopener">Открыть папку фото на Google Drive</a>':"";
+    showMessage("<strong>Обход сохранён.</strong><br>"+esc(j.walk.local_time.date)+" "+esc(j.walk.local_time.time)+" · "+esc(j.walk.result)+" · фото: "+j.walk.photos_uploaded+"."+driveLink);
+
+    state.clear();
+    photoState.forEach(arr=>arr.forEach(entry=>URL.revokeObjectURL(entry.url)));
+    photoState.clear();
     document.querySelectorAll(".st").forEach(b=>b.classList.remove("sel"));
     document.querySelectorAll(".itemComment").forEach(t=>t.value="");
     document.querySelectorAll(".commentBox").forEach(b=>b.classList.remove("show"));
-    document.querySelectorAll(".photoPreviewWrap").forEach(x=>x.classList.remove("show"));
-    document.querySelectorAll(".photoPreview").forEach(x=>x.removeAttribute("src"));
-    document.querySelectorAll(".photoBtn").forEach(x=>{x.classList.remove("ready");x.textContent="📷 Сделать фото"});
+    document.querySelectorAll(".photoGallery").forEach(g=>g.innerHTML="");
+    document.querySelectorAll(".photoCounter").forEach(c=>{const n=Number(c.dataset.photoCounter),rule=photoRules[n];c.textContent="0 / "+rule.min+" минимум";c.classList.remove("ready")});
+    document.querySelectorAll(".photoBtn").forEach(b=>{b.classList.remove("ready");b.textContent="📷 Сделать фото"});
     document.querySelectorAll(".photoInput").forEach(x=>x.value="");
     overall.value="";updateProgress();loadHistory();
   }catch(e){showMessage(esc(e.message||e),"err");updateProgress()}
