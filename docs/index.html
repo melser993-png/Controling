@@ -406,18 +406,18 @@ save.addEventListener("click",async()=>{
     itemsData.push({n:x.n,status,comment});
   }
 
-  const fd=new FormData();
-  fd.append("inspector_name",inspector.value.trim());
-  fd.append("overall_comment",overall.value.trim());
-  fd.append("items",JSON.stringify(itemsData));
-  photoState.forEach((arr,n)=>{
-    arr.forEach((entry,index)=>fd.append("photo_"+n,entry.file,"item-"+String(n).padStart(2,"0")+"-"+String(index+1).padStart(2,"0")+".jpg"));
-  });
-
-  save.disabled=true;save.textContent="Сохраняю обход и фото на Google Drive…";
+  const allPhotos=[];
+  photoState.forEach((arr,n)=>arr.forEach((entry,index)=>allPhotos.push({itemNo:n,photoNo:index+1,file:entry.file})));
+  async function fetchRetry(url,options,tries=3){let last;for(let attempt=1;attempt<=tries;attempt++){try{const r=await fetch(url,options);const j=await r.json().catch(()=>({error:"Сервер вернул некорректный ответ"}));if(!r.ok)throw new Error(j.error||"Ошибка сервера");return j}catch(e){last=e;if(attempt<tries)await new Promise(resolve=>setTimeout(resolve,1000*attempt))}}throw last}
+  save.disabled=true;save.textContent="Создаю обход…";
   try{
-    const r=await fetch(API+"?key="+encodeURIComponent(accessKey),{method:"POST",body:fd}),j=await r.json();
-    if(!r.ok)throw new Error(j.error||"Не удалось сохранить");
+    const base=API+"?key="+encodeURIComponent(accessKey);
+    const started=await fetchRetry(base+"&action=start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inspector_name:inspector.value.trim(),overall_comment:overall.value.trim(),items:itemsData,photos_expected:allPhotos.length})});
+    const walkId=started.walk_id,folderId=started.folder_id;if(!walkId||!folderId)throw new Error("Сервер не создал папку обхода");
+    const batchSize=4;let sent=0;
+    for(let i=0;i<allPhotos.length;i+=batchSize){const batch=allPhotos.slice(i,i+batchSize);save.textContent="Загружаю фото "+sent+"/"+allPhotos.length+"…";const fd=new FormData();fd.append("walk_id",walkId);fd.append("folder_id",folderId);fd.append("inspector_name",inspector.value.trim());fd.append("manifest",JSON.stringify(batch.map(p=>({itemNo:p.itemNo,photoNo:p.photoNo}))));batch.forEach((p,index)=>fd.append("photo_"+index,p.file,"item-"+String(p.itemNo).padStart(2,"0")+"-"+String(p.photoNo).padStart(2,"0")+".jpg"));await fetchRetry(base+"&action=batch",{method:"POST",body:fd});sent+=batch.length;save.textContent="Загружаю фото "+sent+"/"+allPhotos.length+"…"}
+    save.textContent="Проверяю сохранение…";
+    const j=await fetchRetry(base+"&action=finish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({walk_id:walkId,folder_id:folderId,inspector_name:inspector.value.trim()})});
     const driveLink=j.walk.drive_folder_url?'<br><a href="'+j.walk.drive_folder_url+'" target="_blank" rel="noopener">Открыть папку фото на Google Drive</a>':"";
     showMessage("<strong>Обход сохранён.</strong><br>"+esc(j.walk.local_time.date)+" "+esc(j.walk.local_time.time)+" · "+esc(j.walk.result)+" · фото: "+j.walk.photos_uploaded+"."+driveLink);
 
